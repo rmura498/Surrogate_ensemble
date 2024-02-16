@@ -59,13 +59,14 @@ class Proposed():
 
     def forward(self, image, true_label, target_label):
 
-        target_label = torch.tensor([target_label]).to(self.device)
 
         numb_surrogates = len(self.ens_surrogates)
         weights = torch.ones(numb_surrogates).to(self.device) / numb_surrogates
         advx = torch.clone(image).unsqueeze(dim=0).detach().to(self.device)
 
         loss_list = []
+        logits_dist = []
+        weights_list = []
 
         init_loss, pred_label, _ = self._compute_model_loss(self.victim_model, image.unsqueeze(dim=0), target_label,
                                                             clean=True)
@@ -95,12 +96,14 @@ class Proposed():
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
                 n_query += 1
                 loss_list.append(loss_victim.detach().item())
+                logits_dist.append(mean_distance.item())
+                weights_list.append(weights.numpy())
 
                 if pred_label == target_label:
                     print(f"Success pred_label={pred_label.item()}, "
                           f"target={target_label.detach().item()}, queries={n_query}, "
                           f"victmin loss={loss_victim.item()}")
-                    return n_query, loss_list
+                    return n_query, loss_list, logits_dist, n_step, weights_list
 
             else:
 
@@ -120,6 +123,9 @@ class Proposed():
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
                 n_query += 1
                 loss_list.append(loss_victim)
+                logits_dist.append(mean_distance.item())
+                weights_list.append(weights.numpy())
+
                 surrogate_sets = [weights[i] * model(normalize(advx / 255)).detach().squeeze(dim=0) for i, model in
                                   enumerate(self.ens_surrogates)]
 
@@ -127,10 +133,10 @@ class Proposed():
                     print(f"Success pred_label={pred_label.item()}, "
                           f"target={target_label.detach().item()}, queries={n_query}, "
                           f"victmin loss={loss_victim.item()}")
-                    return n_query, loss_list
+                    return n_query, loss_list, logits_dist, n_step, weights_list
 
                 print(f"pred_label={pred_label.item()}, "
-                      f"target={target_label.detach().item()}, queries={n_query},4 "
+                      f"target={target_label.detach().item()}, queries={n_query} "
                       f"victmin loss={loss_victim.item()}")
 
-        return n_query, loss_list
+        return n_query, loss_list, logits_dist, self.attack_iterations, weights_list

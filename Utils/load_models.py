@@ -2,7 +2,11 @@ from collections import defaultdict
 import torchvision.models as models
 from pathlib import Path
 import csv
-def load_imagenet_1000(dataset_root = "imagenet1000"):
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+
+def load_imagenet_1000(dataset_root):
     """
     Dataset downoaded form kaggle
     https://www.kaggle.com/datasets/google-brain/nips-2017-adversarial-learning-development-set
@@ -18,14 +22,15 @@ def load_imagenet_1000(dataset_root = "imagenet1000"):
     img_paths = list(sorted(dataset_root.glob('*.png')))
     gt_dict = defaultdict(int)
     tgt_dict = defaultdict(int)
-    with open(dataset_root / "images.csv", newline='') as csvfile:
+    with open(str(dataset_root) + '/' + "images.csv", newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             gt_dict[row['ImageId']] = int(row['TrueLabel'])
             tgt_dict[row['ImageId']] = int(row['TargetClass'])
-    gt_labels = [gt_dict[key] - 1 for key in sorted(gt_dict)] # zero indexed
-    tgt_labels = [tgt_dict[key] - 1 for key in sorted(tgt_dict)] # zero indexed
+    gt_labels = [gt_dict[key] - 1 for key in sorted(gt_dict)]  # zero indexed
+    tgt_labels = [tgt_dict[key] - 1 for key in sorted(tgt_dict)]  # zero indexed
     return img_paths, gt_labels, tgt_labels
+
 
 def load_model(model_name, device):
     """Load the model according to the idx in list model_names
@@ -41,3 +46,13 @@ def load_model(model_name, device):
     """
     model = getattr(models, model_name)(pretrained=True).to(device).eval()
     return model
+
+
+def load_surrogates(surrogate_list, device):
+    ens_surrogates = []
+
+    for model_name in surrogate_list:
+        print(f"load: {model_name}")
+        ens_surrogates.append(load_model(model_name, device))
+
+    return ens_surrogates
