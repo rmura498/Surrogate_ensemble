@@ -95,7 +95,7 @@ class Baseline():
                 mean_distance = torch.mean(torch.tensor(outputs))
                 print('Mean logits distance', mean_distance.item())
                 logits_dist.append(mean_distance.item())
-                weights_list.append(weights.numpy())
+                weights_list.append(weights.numpy().tolist())
                 if pred_label == target_label:
                     print(f"Success: pred={pred_label} - target={target_label} - query={n_query}")
                     return n_query, v_loss_list, logits_dist, n_step, weights_list
@@ -118,7 +118,7 @@ class Baseline():
                     print(f"Success (plus): pred={pred_label} - target={target_label}, query:{n_query}, victim loss={loss_plus}")
                     v_loss_list.append(loss_plus.detach().item())
                     logits_dist.append(mean_distance_plus.item())
-                    weights_list.append(weights_plus.numpy())
+                    weights_list.append(weights_plus.numpy().tolist())
                     return n_query, v_loss_list, logits_dist, n_step, weights_list
 
                 # optimize w and adv with w = w - delta
@@ -140,7 +140,7 @@ class Baseline():
                           f"query:{n_query}, victim loss={loss_plus}")
                     v_loss_list.append(loss_minus.detach().item())
                     logits_dist.append(mean_distance_minus.item())
-                    weights_list.append(weights_minus.numpy())
+                    weights_list.append(weights_minus.numpy().tolist())
                     return n_query, v_loss_list, logits_dist, n_step, weights_list
 
                 # update weight and adversarial sample x using l+, l-, w+, w-, x+, x-
@@ -151,7 +151,7 @@ class Baseline():
                     last_idx = idx_w
                     v_loss_list.append(loss.detach().item())
                     logits_dist.append(mean_distance_plus.item())
-                    weights_list.append(weights.numpy())
+                    weights_list.append(weights.numpy().tolist())
 
                 else:
                     loss = loss_minus
@@ -160,7 +160,7 @@ class Baseline():
                     last_idx = idx_w
                     v_loss_list.append(loss.detach().item())
                     logits_dist.append(mean_distance_minus.item())
-                    weights_list.append(weights.numpy())
+                    weights_list.append(weights.numpy().tolist())
 
                 if n_query > 5 and last_idx == idx_w:
                     self.lr /= 2

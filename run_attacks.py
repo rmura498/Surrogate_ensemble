@@ -8,7 +8,7 @@ from PIL import Image
 from Utils.utils import save_json, generate_time
 
 # attacks parameters
-numb_surrogates = 5
+numb_surrogates = 10
 eps = 16
 pgd_iterations = 10
 lr_w = 5e-3
@@ -16,7 +16,7 @@ attack_iterations = 40
 alpha = 3 * eps / pgd_iterations
 x = alpha
 device = f'cpu'
-batch_size = 1
+batch_size = 5
 loss = 'CW'
 
 # loading dataset
@@ -26,7 +26,7 @@ samples_idx = [i for i in range(batch_size)]
 # load models
 victim_models = ['resnext50_32x4d', 'vgg19', 'densenet121']
 ens_surrogates = load_surrogates(SURROGATE_NAMES[:numb_surrogates], device)
-victim_model = load_model(victim_models[0], device)
+victim_model = load_model(victim_models[1], device)
 
 baseline_results_dict = {}
 proposed_results_dict = {}
@@ -65,4 +65,7 @@ for index in samples_idx:
                                          'n_iter': n_iter_p,
                                          'weights': weights_p}
 
-save_json(baseline_results_dict, f'{generate_time()}_victim_{victim_models[0]}_batch_{batch_size}_numb_surr{numb_surrogates}')
+save_json(baseline_results_dict,
+          f'{generate_time()}_BASELINE_victim_{victim_models[1]}_batch_{batch_size}_numb_surr{numb_surrogates}')
+save_json(proposed_results_dict,
+          f'{generate_time()}_PROPOSED_victim_{victim_models[1]}_batch_{batch_size}_numb_surr{numb_surrogates}')

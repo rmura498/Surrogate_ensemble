@@ -97,7 +97,7 @@ class Proposed():
                 n_query += 1
                 loss_list.append(loss_victim.detach().item())
                 logits_dist.append(mean_distance.item())
-                weights_list.append(weights.numpy())
+                weights_list.append(weights.numpy().tolist())
 
                 if pred_label == target_label:
                     print(f"Success pred_label={pred_label.item()}, "
@@ -124,7 +124,7 @@ class Proposed():
                 n_query += 1
                 loss_list.append(loss_victim)
                 logits_dist.append(mean_distance.item())
-                weights_list.append(weights.numpy())
+                weights_list.append(weights.numpy().tolist())
 
                 surrogate_sets = [weights[i] * model(normalize(advx / 255)).detach().squeeze(dim=0) for i, model in
                                   enumerate(self.ens_surrogates)]
