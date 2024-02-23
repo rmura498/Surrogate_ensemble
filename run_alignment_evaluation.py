@@ -6,11 +6,21 @@ from Utils.CW_loss import CWLoss
 from Utils.utils import save_json, generate_time
 from config import DATASET_PATH, SURROGATE_NAMES
 from PIL import Image
+import argparse
 
+parser = argparse.ArgumentParser(description="Run Alignment Computation")
+
+parser.add_argument('--n_surrogates', type=int, default=20, help='Number of Surrogates')
+parser.add_argument('--batch_size', type=int, default=10, help='Number of sample to evaluate')
+parser.add_argument('--device', type=str, default='cpu', choices=['cuda', 'cpu'], help='Device to use (cpu, cuda:0, '
+                                                                                       'cuda:1)')
+
+args = parser.parse_args()
+print("running alignment computation ")
 # parameters
-numb_surrogates = 20
-device = f'cpu'
-batch_size = 10
+numb_surrogates = int(args.n_surrogates)
+device = args.device
+batch_size = int(args.batch_size)
 loss_fn = CWLoss()
 
 # loading dataset
@@ -38,4 +48,4 @@ for victim in victim_models:
         alignment_samples.append(alignment_dict)
     vic_dict[victim] = alignment_samples
 
-save_json(vic_dict, f'{generate_time()}_batch_{batch_size}_alignment_exp')
+save_json(vic_dict, f'Results/{generate_time()}_batch_{batch_size}_n_surr_{numb_surrogates}_alignment_exp')

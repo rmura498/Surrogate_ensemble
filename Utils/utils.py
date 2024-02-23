@@ -1,3 +1,5 @@
+import os.path
+
 from torchvision import transforms
 import json
 import datetime
@@ -19,6 +21,8 @@ def read_json(config_file_path):
 
 
 def save_json(file, config_file_path):
+    if not os.path.exists('/Results'):
+        os.makedirs('Results')
     with open(config_file_path, "w") as config_file:
         json.dump(file, config_file, indent=4)
 
