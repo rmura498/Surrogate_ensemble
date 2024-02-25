@@ -20,10 +20,10 @@ def read_json(config_file_path):
     return config_data
 
 
-def save_json(file, config_file_path):
-    if not os.path.exists('/Results'):
+def save_json(file, config_file_path, folder_name):
+    if not os.path.exists(folder_name):
         os.makedirs('Results')
-    with open(config_file_path, "w") as config_file:
+    with open(folder_name +'/'+config_file_path, "w") as config_file:
         json.dump(file, config_file, indent=4)
 
 def generate_time():
