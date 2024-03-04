@@ -30,9 +30,9 @@ samples_idx = [i for i in range(batch_size)]
 victim_models = ['resnext50_32x4d', 'vgg19', 'densenet121']
 ens_surrogates = load_surrogates(SURROGATE_NAMES[:numb_surrogates], device)
 
-vic_dict = {}
 to_tensor = transforms.ToTensor()
 for victim in victim_models:
+    vic_dict = {}
     victim_model = load_model(victim, device)
     alignment_samples = []
     for index in samples_idx:
