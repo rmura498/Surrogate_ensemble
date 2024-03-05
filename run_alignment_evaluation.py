@@ -31,8 +31,8 @@ victim_models = ['resnext50_32x4d', 'vgg19', 'densenet121']
 ens_surrogates = load_surrogates(SURROGATE_NAMES[:numb_surrogates], device)
 
 to_tensor = transforms.ToTensor()
+vic_dict = {}
 for victim in victim_models:
-    vic_dict = {}
     victim_model = load_model(victim, device)
     alignment_samples = []
     for index in samples_idx:
@@ -47,4 +47,4 @@ for victim in victim_models:
         alignment_samples.append(alignment_dict)
     vic_dict[victim] = alignment_samples
 
-    save_json(vic_dict, f'{generate_time()}_batch_{batch_size}_n_surr_{numb_surrogates}_alignment_exp', "Results")
+save_json(vic_dict, f'{generate_time()}_batch_{batch_size}_n_surr_{numb_surrogates}_alignment_exp', "Results")
