@@ -3,7 +3,7 @@ from Utils.utils import normalize
 from config import SURROGATE_NAMES
 
 
-def compute_alignment(input, victim_model, ens_surrogates, loss_fn, target):
+def compute_alignment(image, victim_model, ens_surrogates, loss_fn, target):
     alignment_dict = {}
     image = image.unsqueeze(dim=0)
     image.requires_grad_()
