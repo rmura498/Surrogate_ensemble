@@ -43,7 +43,7 @@ for victim in victim_models:
         target = torch.tensor([target_label]).to(device)
         alignment_per_sample = []
         print(f"\n-------- Sample Number:{index} -------- ")
-        alignment_dict = compute_alignment(input, victim_model, ens_surrogates, loss_fn, target)
+        alignment_dict = compute_alignment(input, victim_model, ens_surrogates, loss_fn, label)
         alignment_samples.append(alignment_dict)
     vic_dict[victim] = alignment_samples
 
