@@ -13,7 +13,7 @@ def read_json(config_file_path):
     return config_data
 
 
-def save_json(file, config_file_path, folder_name):
+def save_json(file, config_file_path, folder_name='Results'):
     if not os.path.exists(folder_name):
         os.makedirs('Results')
     with open(folder_name + '/' + config_file_path, "w") as config_file:

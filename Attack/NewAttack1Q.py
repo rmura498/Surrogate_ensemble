@@ -3,7 +3,7 @@ from Utils.CW_loss import CWLoss
 from torch.nn import CrossEntropyLoss
 
 
-class Proposed():
+class Proposed1Q():
     def __init__(self, victim_model, ens_surrogates, attack_iterations,
                  alpha, lr, eps, pgd_iterations=10, loss='CW', device='cpu'):
 
@@ -82,9 +82,8 @@ class Proposed():
             print(f'#Iteration - {n_step}#')
 
             if n_step == 0:
-                
-                advx = self._pgd_cycle(weights, advx, target_label)
 
+                advx = self._pgd_cycle(weights, advx, target_label)
                 mean_distance, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
                 print(f'Mean logits distance first iter', mean_distance.item())
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
@@ -95,28 +94,33 @@ class Proposed():
 
                 if pred_label == target_label:
                     print(f"Success pred_label={pred_label.item()}, "
-                          f"target={target_label.detach().item()}, queries={n_query}, "
+                          f"target={target_label.detach().item()}, queries={n_query},"
                           f"victmin loss={loss_victim.item()}")
                     return n_query, loss_list, logits_dist, n_step, weights_list
 
-            else:
 
+                #computing solution
                 B = torch.clone(victim_logits)
                 A = torch.stack(surrogate_sets, dim=0)
                 solution = torch.linalg.lstsq(B.T, A.T).solution
                 weights = torch.clone(solution).squeeze()
+                loss_list.append(loss_victim.detach().item())
 
-                mean_distance, surrogate_sets = self._mean_logits_distance(advx, weights, victim_model, ens_surrogates)
-                print(f'Mean logits distance iter{n_step}', mean_distance.item())
+                #print("Weights after solution", weights)
+                #mean_distance, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
+                #print(f'Mean logits distance iter{n_step}', mean_distance.item())
+
+            else:
 
                 advx = self._pgd_cycle(weights, advx, target_label)
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
                 n_query += 1
                 loss_list.append(loss_victim.item())
-                logits_dist.append(mean_distance.item())
                 weights_list.append(weights.cpu().numpy().tolist())
 
-                _, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
+                mean_distance, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
+                print(f'Mean logits distance iter{n_step}', mean_distance.item())
+                logits_dist.append(mean_distance.item())
 
                 if pred_label == target_label:
                     print(f"Success pred_label={pred_label.item()}, "
