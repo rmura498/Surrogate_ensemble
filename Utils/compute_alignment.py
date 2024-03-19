@@ -2,12 +2,13 @@ import torch
 from config import SURROGATE_NAMES
 
 
-def compute_alignment(image, victim_model, ens_surrogates, loss_fn, target):
+def compute_alignment(image, victim_model, ens_surrogates, loss_fn, label):
     alignment_dict = {}
     image = image.unsqueeze(dim=0)
     image.requires_grad_()
+    print('True lable', label)
     vic_outputs = victim_model(image)
-    lossv = loss_fn(vic_outputs, target)
+    lossv = loss_fn(vic_outputs, label)
     lossv.backward()
     with torch.no_grad():
         vic_grad = image.grad.detach()
@@ -16,7 +17,7 @@ def compute_alignment(image, victim_model, ens_surrogates, loss_fn, target):
     for i, model in enumerate(ens_surrogates):
         image.grad.data.zero_()
         outputs = model(image)
-        loss = loss_fn(outputs, target)
+        loss = loss_fn(outputs, label)
         loss.backward()
         with torch.no_grad():
             surr_grad = image.grad.detach()

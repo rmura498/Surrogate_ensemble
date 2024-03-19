@@ -1,38 +1,46 @@
-from collections import defaultdict
+import torchvision
 import torchvision.models as models
-from pathlib import Path
-import csv
+import torchvision.transforms as transforms
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
+import Utils.imagenet_1k
+from Utils.imagenet_1k import normalize_model
+
+mu = (0.485, 0.456, 0.406)
+sigma = (0.229, 0.224, 0.225)
+
+def load_dataset(dataset_name='imagenet'):
+    if dataset_name == 'cifar10':
+        transform = transforms.Compose([
+            transforms.ToTensor()
+        ])
+    elif dataset_name == 'imagenet':
+        transform = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor()
+        ])
+
+    if dataset_name == 'mnist':
+        dataset = torchvision.datasets.MNIST('./Models/data',
+                                             train=False,
+                                             download=True,
+                                             transform=transform)
+    elif dataset_name == 'cifar10':
+        dataset = torchvision.datasets.CIFAR10('./Models/data',
+                                                   train=False,
+                                                   download=True,
+                                                   transform=transform)
+    elif dataset_name == 'imagenet':
+        dataset = Utils.imagenet_1k.ImageNet1K(dataset_root='./Models/data/imagenet1000',
+                                               transform=transform)
+    else:
+        raise NotImplementedError("Unknown dataset")
+
+    return dataset
 
 
-def load_imagenet_1000(dataset_root):
-    """
-    Dataset downoaded form kaggle
-    https://www.kaggle.com/datasets/google-brain/nips-2017-adversarial-learning-development-set
-    Resized from 299x299 to 224x224
-    Args:
-        dataset_root (str): root folder of dataset
-    Returns:
-        img_paths (list of strs): the paths of images
-        gt_labels (list of ints): the ground truth label of images
-        tgt_labels (list of ints): the target label of images
-    """
-    dataset_root = Path(dataset_root)
-    img_paths = list(sorted(dataset_root.glob('*.png')))
-    gt_dict = defaultdict(int)
-    tgt_dict = defaultdict(int)
-    with open(str(dataset_root) + '/' + "images.csv", newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            gt_dict[row['ImageId']] = int(row['TrueLabel'])
-            tgt_dict[row['ImageId']] = int(row['TargetClass'])
-    gt_labels = [gt_dict[key] - 1 for key in sorted(gt_dict)]  # zero indexed
-    tgt_labels = [tgt_dict[key] - 1 for key in sorted(tgt_dict)]  # zero indexed
-    return img_paths, gt_labels, tgt_labels
-
-
-def load_model(model_name, device):
+def load_model(model_name, device, normalization=True):
     """Load the model according to the idx in list model_names
 
     Args:
@@ -45,6 +53,8 @@ def load_model(model_name, device):
         model (torchvision.models): the loaded model
     """
     model = getattr(models, model_name)(pretrained=True).to(device).eval()
+    if normalization:
+        model = normalize_model(model, mu, sigma)
     return model
 
 

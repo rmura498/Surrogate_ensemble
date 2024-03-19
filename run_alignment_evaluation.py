@@ -3,7 +3,7 @@ from torchvision import transforms
 from Utils.load_models import load_model, load_imagenet_1000, load_surrogates
 from Utils.compute_alignment import compute_alignment
 from Utils.CW_loss import CWLoss
-from Utils.utils import save_json, generate_time
+from Utils.utils import save_json, generate_time, normalize
 from config import DATASET_PATH, SURROGATE_NAMES
 from PIL import Image
 import argparse
@@ -43,6 +43,7 @@ for victim in victim_models:
         target = torch.tensor([target_label]).to(device)
         alignment_per_sample = []
         print(f"\n-------- Sample Number:{index} -------- ")
+        input = normalize(input)
         alignment_dict = compute_alignment(input, victim_model, ens_surrogates, loss_fn, label)
         alignment_samples.append(alignment_dict)
     vic_dict[victim] = alignment_samples

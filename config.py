@@ -7,4 +7,4 @@ SURROGATE_NAMES =['inception_v3' ,'vgg16_bn', 'squeezenet1_1', 'googlenet', 'res
 
 VICTIM_NAMES = ['resnext50_32x4d', 'vgg19','densenet121']
 
-DATASET_PATH = 'imagenet1000/'
+DATASET_PATH = './Models/data/imagenet1000'
