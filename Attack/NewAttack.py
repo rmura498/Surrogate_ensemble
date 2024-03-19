@@ -106,7 +106,7 @@ class Proposed():
                 solution = torch.linalg.lstsq(B.T, A.T).solution
                 weights = torch.clone(solution).squeeze()
 
-                mean_distance, surrogate_sets = self._mean_logits_distance(advx, weights, victim_model, ens_surrogates)
+                mean_distance, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
                 print(f'Mean logits distance iter{n_step}', mean_distance.item())
 
                 advx = self._pgd_cycle(weights, advx, target_label)
