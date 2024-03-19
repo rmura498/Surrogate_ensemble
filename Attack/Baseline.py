@@ -1,5 +1,4 @@
 import torch
-from Utils.utils import normalize
 from Utils.CW_loss import CWLoss
 from torch.nn import CrossEntropyLoss
 
@@ -22,15 +21,10 @@ class Baseline():
 
         self.loss_fn = loss_functions[loss]
 
-    def _compute_model_loss(self, model, advx, target, clean=False):
-
-        if not clean:
-            input_tens = normalize(advx / 255)
-        else:
-            input_tens = advx
+    def _compute_model_loss(self, model, advx, target):
 
         model.eval()
-        logits = model(input_tens)
+        logits = model(advx)
         logits = logits.detach()
         pred_label = logits.argmax()
         loss = self.loss_fn(logits, target)
@@ -43,9 +37,8 @@ class Baseline():
 
         for i in range(self.pgd_iterations):
             advx.requires_grad_()
-            input_tens = normalize(advx / 255)
 
-            outputs = [weights[i] * model(input_tens) for i, model in enumerate(self.ens_surrogates)]
+            outputs = [weights[i] * model(advx) for i, model in enumerate(self.ens_surrogates)]
             loss = sum([weights[idx] * self.loss_fn(outputs[idx], target) for idx in range(numb_surrogates)])
 
             loss.backward()
@@ -53,14 +46,21 @@ class Baseline():
             with torch.no_grad():
                 grad = advx.grad
                 advx = advx - self.alpha * torch.sign(grad)  # perturb x
-                advx = advx.detach().clamp(min=0 - self.eps, max=self.eps).clamp(0, 255)
+                advx = advx.detach().clamp(min=0 - self.eps, max=self.eps).clamp(0, 1)
 
         return advx
+
+    def _mean_logits_distance(advx, weights, victim_model, ens_surrogates):
+        surrogate_sets = [model(advx).detach().squeeze(dim=0) for model in ens_surrogates]
+        outputs = [torch.norm((victim_model(advx) - weights[i] * surr_log.unsqueeze(dim=0)), p=2).item() for
+                   i, surr_log in enumerate(surrogate_sets)]
+        mean_distance = torch.mean(torch.tensor(outputs))
+
+        return mean_distance
 
     def forward(self, image, true_label, target_label):
 
         n_query = 0
-
 
         numb_surrogates = len(self.ens_surrogates)
         weights = torch.ones(numb_surrogates).to(self.device) / numb_surrogates
@@ -72,14 +72,13 @@ class Baseline():
         logits_dist = []
         weights_list = []
 
-        init_loss, pred_label, _ = self._compute_model_loss(self.victim_model, image.unsqueeze(dim=0), target_label,
-                                                            clean=True)
+        init_loss, pred_label, _ = self._compute_model_loss(self.victim_model, image.unsqueeze(dim=0), target_label)
         print("True label", true_label.item())
         print("pred label", pred_label.item())
         print("inital victim loss", init_loss.item())
         v_loss_list.append(init_loss.detach().item())
 
-        for n_step in range(self.attack_iterations//2):
+        for n_step in range(self.attack_iterations // 2):
             print(f"Step: {n_step}")
 
             if n_step == 0:
@@ -90,7 +89,7 @@ class Baseline():
                 v_loss_list.append(loss_victim.detach().item())
                 n_query += 1
 
-                outputs = [torch.norm(victim_logits - weights[i] * model(normalize(advx/255)), p=2).item() for i, model in
+                outputs = [torch.norm(victim_logits - weights[i] * model(advx), p=2).item() for i, model in
                            enumerate(self.ens_surrogates)]
                 mean_distance = torch.mean(torch.tensor(outputs))
                 print('Mean logits distance', mean_distance.item())
@@ -106,16 +105,18 @@ class Baseline():
                 weights_plus[idx_w] = weights_plus[idx_w] + self.lr
 
                 advx_plus = self._pgd_cycle(weights_plus, advx, target_label)
-                loss_plus, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx_plus, target_label)
+                loss_plus, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx_plus,
+                                                                                target_label)
                 n_query += 1
 
-                outputs = [torch.norm(victim_logits - weights_plus[i] * model(normalize(advx_plus/255)), p=2).item() for i, model in
+                outputs = [torch.norm(victim_logits - weights_plus[i] * model(advx_plus), p=2).item() for i, model in
                            enumerate(self.ens_surrogates)]
                 mean_distance_plus = torch.mean(torch.tensor(outputs))
                 print('Mean logits distance', mean_distance_plus.item())
 
                 if pred_label == target_label:
-                    print(f"Success (plus): pred={pred_label} - target={target_label}, query:{n_query}, victim loss={loss_plus}")
+                    print(
+                        f"Success (plus): pred={pred_label} - target={target_label}, query:{n_query}, victim loss={loss_plus}")
                     v_loss_list.append(loss_plus.detach().item())
                     logits_dist.append(mean_distance_plus.item())
                     weights_list.append(weights_plus.numpy().tolist())
@@ -127,10 +128,10 @@ class Baseline():
 
                 advx_minus = self._pgd_cycle(weights_minus, advx, target_label)
                 loss_minus, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx_minus,
-                                                                                target_label)
+                                                                                 target_label)
                 n_query += 1
 
-                outputs = [torch.norm(victim_logits - weights_minus[i] * model(normalize(advx_minus / 255)), p=2).item()
+                outputs = [torch.norm(victim_logits - weights_minus[i] * model(advx_minus), p=2).item()
                            for i, model in enumerate(self.ens_surrogates)]
                 mean_distance_minus = torch.mean(torch.tensor(outputs))
                 print('Mean logits distance', mean_distance_minus.item())
@@ -170,6 +171,5 @@ class Baseline():
                 # print("pred label", pred_label.detach())
                 # print("target label", target_label)
                 # print("last idx", last_idx)
-
 
         return n_query, v_loss_list, logits_dist, self.attack_iterations, weights_list
