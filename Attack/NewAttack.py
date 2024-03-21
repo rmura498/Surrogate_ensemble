@@ -108,7 +108,6 @@ class Proposed():
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
                 n_query += 1
                 loss_list.append(loss_victim.item())
-                logits_dist.append(mean_distance.item())
                 weights_list.append(weights.cpu().numpy().tolist())
 
                 _, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
