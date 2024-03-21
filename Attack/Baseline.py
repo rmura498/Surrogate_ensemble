@@ -5,7 +5,7 @@ from torch.nn import CrossEntropyLoss
 
 class Baseline():
     def __init__(self, victim_model, ens_surrogates, attack_iterations,
-                 alpha, lr, eps, pgd_iterations=10, loss='CW', device='cpu'):
+                 alpha, lr, eps, pgd_iterations=10, loss='CW', device='cuda'):
 
         self.device = device
         self.victim_model = victim_model
@@ -69,7 +69,6 @@ class Baseline():
         idx_w = 0
         last_idx = 0
         v_loss_list = []
-        logits_dist = []
         weights_list = []
 
         init_loss, pred_label, _ = self._compute_model_loss(self.victim_model, image.unsqueeze(dim=0), target_label)
@@ -89,18 +88,15 @@ class Baseline():
                 v_loss_list.append(loss_victim.detach().item())
                 n_query += 1
 
-                mean_distance = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
-                print('Mean logits distance', mean_distance.item())
-                logits_dist.append(mean_distance.item())
 
                 weights_list.append(weights.cpu().numpy().tolist())
                 if pred_label == target_label:
                     print(f"Success: pred={pred_label} - target={target_label} - query={n_query}")
-                    return n_query, v_loss_list, logits_dist, n_step, weights_list
+                    return n_query, v_loss_list, n_step, weights_list
 
             else:
                 # optimize w and adv with w = w + delta
-                weights_plus = torch.clone(weights)
+                weights_plus = torch.clone(weights).to(self.device)
                 weights_plus[idx_w] = weights_plus[idx_w] + self.lr
 
                 advx_plus = self._pgd_cycle(weights_plus, advx, target_label)
@@ -108,19 +104,15 @@ class Baseline():
                                                                                 target_label)
                 n_query += 1
 
-                mean_distance_plus = self._mean_logits_distance(advx_plus, weights_plus, self.victim_model, self.ens_surrogates)
-                print('Mean logits distance', mean_distance_plus.item())
-
                 if pred_label == target_label:
                     print(
                         f"Success (plus): pred={pred_label} - target={target_label}, query:{n_query}, victim loss={loss_plus}")
                     v_loss_list.append(loss_plus.detach().item())
-                    logits_dist.append(mean_distance_plus.item())
                     weights_list.append(weights_plus.cpu().numpy().tolist())
-                    return n_query, v_loss_list, logits_dist, n_step, weights_list
+                    return n_query, v_loss_list, n_step, weights_list
 
                 # optimize w and adv with w = w - delta
-                weights_minus = torch.clone(weights)
+                weights_minus = torch.clone(weights).to(self.device)
                 weights_minus[idx_w] = weights_minus[idx_w] - self.lr
 
                 advx_minus = self._pgd_cycle(weights_minus, advx, target_label)
@@ -128,34 +120,28 @@ class Baseline():
                                                                                  target_label)
                 n_query += 1
 
-                mean_distance_minus = self._mean_logits_distance(advx_minus, weights_minus, self.victim_model, self.ens_surrogates)
-                print('Mean logits distance', mean_distance_minus.item())
-
                 if pred_label == target_label:
                     print(f"Success (plus): pred={pred_label} - target={target_label}, "
                           f"query:{n_query}, victim loss={loss_plus}")
                     v_loss_list.append(loss_minus.detach().item())
-                    logits_dist.append(mean_distance_minus.item())
                     weights_list.append(weights_minus.cpu().numpy().tolist())
-                    return n_query, v_loss_list, logits_dist, n_step, weights_list
+                    return n_query, v_loss_list, n_step, weights_list
 
                 # update weight and adversarial sample x using l+, l-, w+, w-, x+, x-
                 if loss_plus < loss_minus:
                     loss = loss_plus
-                    weights = torch.clone(weights_plus)
-                    advx = torch.clone(advx_plus).detach()
+                    weights = torch.clone(weights_plus).to(self.device)
+                    advx = torch.clone(advx_plus).detach().to(self.device)
                     last_idx = idx_w
                     v_loss_list.append(loss.detach().item())
-                    logits_dist.append(mean_distance_plus.item())
                     weights_list.append(weights.cpu().numpy().tolist())
 
                 else:
                     loss = loss_minus
-                    weights = torch.clone(weights_minus)
-                    advx = torch.clone(advx_minus).detach()
+                    weights = torch.clone(weights_minus).to(self.device)
+                    advx = torch.clone(advx_minus).detach().to(self.device)
                     last_idx = idx_w
                     v_loss_list.append(loss.detach().item())
-                    logits_dist.append(mean_distance_minus.item())
                     weights_list.append(weights.cpu().numpy().tolist())
 
                 if n_query > 5 and last_idx == idx_w:
@@ -166,4 +152,4 @@ class Baseline():
                       f"target={target_label.detach().item()}, queries={n_query} "
                       f"victmin loss={loss_victim.item()}")
 
-        return n_query, v_loss_list, logits_dist, self.attack_iterations, weights_list
+        return n_query, v_loss_list, self.attack_iterations, weights_list

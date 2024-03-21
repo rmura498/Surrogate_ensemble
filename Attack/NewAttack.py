@@ -5,7 +5,7 @@ from torch.nn import CrossEntropyLoss
 
 class Proposed():
     def __init__(self, victim_model, ens_surrogates, attack_iterations,
-                 alpha, lr, eps, pgd_iterations=10, loss='CW', device='cpu'):
+                 alpha, lr, eps, pgd_iterations=10, loss='CW', device='cuda'):
 
         self.device = device
         self.victim_model = victim_model
@@ -65,7 +65,6 @@ class Proposed():
         advx = torch.clone(image).unsqueeze(dim=0).detach().to(self.device)
 
         loss_list = []
-        logits_dist = []
         weights_list = []
 
         init_loss, pred_label, _ = self._compute_model_loss(self.victim_model, image.unsqueeze(dim=0), target_label)
@@ -85,29 +84,25 @@ class Proposed():
                 
                 advx = self._pgd_cycle(weights, advx, target_label)
 
-                mean_distance, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
-                print(f'Mean logits distance first iter', mean_distance.item())
+                _, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
                 n_query += 1
                 loss_list.append(loss_victim.detach().item())
-                logits_dist.append(mean_distance.item())
                 weights_list.append(weights.cpu().numpy().tolist())
 
                 if pred_label == target_label:
                     print(f"Success pred_label={pred_label.item()}, "
                           f"target={target_label.detach().item()}, queries={n_query}, "
                           f"victmin loss={loss_victim.item()}")
-                    return n_query, loss_list, logits_dist, n_step, weights_list
+                    return n_query, loss_list, n_step, weights_list
 
             else:
 
-                B = torch.clone(victim_logits)
+                B = torch.clone(victim_logits).to(self.device)
                 A = torch.stack(surrogate_sets, dim=0)
                 solution = torch.linalg.lstsq(B.T, A.T).solution
-                weights = torch.clone(solution).squeeze()
+                weights = torch.clone(solution).squeeze().to(self.device)
 
-                mean_distance, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
-                print(f'Mean logits distance iter{n_step}', mean_distance.item())
 
                 advx = self._pgd_cycle(weights, advx, target_label)
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
@@ -122,10 +117,10 @@ class Proposed():
                     print(f"Success pred_label={pred_label.item()}, "
                           f"target={target_label.detach().item()}, queries={n_query}, "
                           f"victmin loss={loss_victim.item()}")
-                    return n_query, loss_list, logits_dist, n_step, weights_list
+                    return n_query, loss_list, n_step, weights_list
 
                 print(f"pred_label={pred_label.item()}, "
                       f"target={target_label.detach().item()}, queries={n_query} "
                       f"victmin loss={loss_victim.item()}")
 
-        return n_query, loss_list, logits_dist, self.attack_iterations, weights_list
+        return n_query, loss_list, self.attack_iterations, weights_list
