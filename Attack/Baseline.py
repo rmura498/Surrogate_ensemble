@@ -31,7 +31,7 @@ class Baseline():
 
         return loss, pred_label, logits
 
-    def _pgd_cycle(self, weights, advx, target):
+    def _pgd_cycle(self, image, weights, advx, target):
 
         numb_surrogates = len(self.ens_surrogates)
 
@@ -40,13 +40,12 @@ class Baseline():
 
             outputs = [weights[i] * model(advx) for i, model in enumerate(self.ens_surrogates)]
             loss = sum([weights[idx] * self.loss_fn(outputs[idx], target) for idx in range(numb_surrogates)])
-
             loss.backward()
 
             with torch.no_grad():
                 grad = advx.grad
                 advx = advx - self.alpha * torch.sign(grad)  # perturb x
-                advx = advx.detach().clamp(min=0 - self.eps, max=self.eps).clamp(0, 1)
+                advx = (image + (advx - image).clamp(min=-self.eps, max=self.eps)).clamp(0, 1)
 
         return advx
 
@@ -82,7 +81,7 @@ class Baseline():
 
             if n_step == 0:
 
-                advx = self._pgd_cycle(weights, advx, target_label)
+                advx = self._pgd_cycle(image, weights, advx, target_label)
 
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
                 v_loss_list.append(loss_victim.detach().item())
@@ -99,7 +98,7 @@ class Baseline():
                 weights_plus = torch.clone(weights).to(self.device)
                 weights_plus[idx_w] = weights_plus[idx_w] + self.lr
 
-                advx_plus = self._pgd_cycle(weights_plus, advx, target_label)
+                advx_plus = self._pgd_cycle(image, weights_plus, advx, target_label)
                 loss_plus, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx_plus,
                                                                                 target_label)
                 n_query += 1
@@ -115,7 +114,7 @@ class Baseline():
                 weights_minus = torch.clone(weights).to(self.device)
                 weights_minus[idx_w] = weights_minus[idx_w] - self.lr
 
-                advx_minus = self._pgd_cycle(weights_minus, advx, target_label)
+                advx_minus = self._pgd_cycle(image, weights_minus, advx, target_label)
                 loss_minus, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx_minus,
                                                                                  target_label)
                 n_query += 1

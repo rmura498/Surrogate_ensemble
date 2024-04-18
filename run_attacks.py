@@ -2,8 +2,8 @@ import torch
 from torch.utils.data import DataLoader
 from Attack.Baseline import Baseline
 from Attack.NewAttack import Proposed
-from Attack.NewAttack1Q import Proposed1Q
-from Attack.NewAttackUpdated import newProposed
+from Attack.Average0Q import Average0
+from Attack.NewAttackUpdated_v2 import newProposed
 from config import SURROGATE_NAMES, VICTIM_NAMES
 from Utils.load_models import load_model, load_dataset, load_surrogates
 from PIL import Image
@@ -12,19 +12,19 @@ from Utils.load_models import load_dataset, load_model
 import argparse
 
 parser = argparse.ArgumentParser(description="Run Attacks")
-parser.add_argument('--attack_type', type=str, default='B', choices=['B', 'P', 'P1Q', 'nP'], help='Type of attack')
+parser.add_argument('--attack_type', type=str, default='B', choices=['B', 'P', 'A', 'nP'], help='Type of attack')
 parser.add_argument('--victim', type=str, default='vgg19',
                     choices=['resnext50_32x4d', 'vgg19', 'densenet121', 'alexnet', 'swin_s', 'shufflenet_v2_x2_0',
                              'regnet_y_32gf', 'efficientnet_v2_l'], help='Type of attack')
 parser.add_argument('--n_surrogates', type=int, default=20, help='Number of Surrogates')
 parser.add_argument('--batch_size', type=int, default=10, help='Number of sample to evaluate')
-parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'], help='Device to use (cpu, cuda:0, '
+parser.add_argument('--device', type=str, default='cuda', choices=['cuda:0', 'cuda:1', 'cuda:2', 'cpu'], help='Device to use (cpu, cuda:0, '
                                                                                         'cuda:1)')
 parser.add_argument('--attack_iterations', type=int, default=40, help='Number of attack iterations')
-parser.add_argument('--pgd_iterations', type=int, default=5, help='Number of pgd iterations')
+parser.add_argument('--pgd_iterations', type=int, default=10, help='Number of pgd iterations')
 parser.add_argument('--loss', type=str, default='CW', choices=['CW', 'CE'], help='Loss function')
 parser.add_argument('--pool', type=str, default='0', choices=['0', '1'], help='Pool of surrogates')
-parser.add_argument('--eps', type=float, default=16 / 255, help='Number of Surrogates')
+parser.add_argument('--eps', type=float, default=16 / 255, help='Perturbation Size')
 args = parser.parse_args()
 
 # attacks parameters
@@ -42,7 +42,7 @@ alpha = 2 * eps / pgd_iterations
 x = alpha
 pool = int(args.pool)
 
-attack_dict = {'B': Baseline, 'P': Proposed, 'P1Q': Proposed1Q, 'nP': newProposed}
+attack_dict = {'B': Baseline, 'P': Proposed, 'A': Average0, 'nP': newProposed}
 attack = attack_dict[attack_type]
 
 if pool == 0:
@@ -53,11 +53,22 @@ elif pool == 1:
                   "resnet101", 'inception_v3', 'mnasnet1_0', 'googlenet',
                   'resnet18', 'convnext_small', 'mobilenet_v3_small']
 
-elif pool == 2:
+# loading dataset
+dataset = load_dataset(dataset_name='imagenet')
+dataloader = DataLoader(
+    dataset=dataset,
+    batch_size=batch_size,
+    shuffle=False
+)
+images, labels, targets = next(iter(dataloader))
+images = images.to(device)
+labels = labels.to(device)
+targets = targets.to(device)
 
-    surrogates = ["densenet161", "efficientnet_v2_l", "regnet_y_16gf",
-                  "resnet101", 'inception_v3', 'mnasnet1_0', 'googlenet',
-                  'resnet18', 'convnext_small', 'mobilenet_v3_small']
+# load models
+ens_surrogates = [load_model(surrogate, device=device).to(device) for surrogate in surrogates]
+victim_model = load_model(victim_name, device=device).to(device)
+
 
 
 def attack_evaluate():
@@ -88,25 +99,7 @@ def attack_evaluate():
                                   'weights': weights_b}
 
     save_json(results_dict,
-              f'{generate_time()}_{str(attack_dict[attack_type].__name__)}_{victim_name}_b{batch_size}_eps{str(eps)}_pool{pool}_surr{numb_surrogates}')
-
-
-# loading dataset
-dataset = load_dataset(dataset_name='imagenet')
-dataloader = DataLoader(
-    dataset=dataset,
-    batch_size=batch_size,
-    shuffle=False
-)
-images, labels, targets = next(iter(dataloader))
-images = images.to(device)
-labels = labels.to(device)
-targets = targets.to(device)
-
-# load models
-# victim_models = [load_model(victim, device=device).to(device) for victim in VICTIM_NAMES]
-ens_surrogates = [load_model(surrogate, device=device).to(device) for surrogate in surrogates]
-victim_model = load_model(victim_name, device=device).to(device)
+              f'{generate_time()}_{str(attack_dict[attack_type].__name__)}_{victim_name}_b{batch_size}_eps{str(eps)[0:5]}_pool{pool}_surr{numb_surrogates}_PGDi{pgd_iterations}')
 
 # run attacks
 attack_evaluate()
