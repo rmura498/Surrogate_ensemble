@@ -83,6 +83,6 @@ class Average0():
             print(f"Success pred_label={pred_label.item()}, "
                     f"target={target_label.detach().item()}, queries={n_query},"
                     f"victmin loss={loss_victim.item()}")
-            return n_query, loss_list, 'ASR:1', weights_list
+            return 0, loss_list, 'ASR:1', weights_list
 
-        return n_query, loss_list, 'ASR:0', weights_list
+        return 40, loss_list, 'ASR:0', weights_list
