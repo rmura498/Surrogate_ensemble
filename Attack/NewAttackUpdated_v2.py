@@ -39,8 +39,8 @@ class newProposed:
         model.eval()
         logits = model(advx)
         logits = logits.detach()
-        pred_label = (torch.softmax(logits, dim=1)).argmax()
-        loss = self.loss_fn(torch.softmax(logits, dim=1), target)
+        pred_label = (logits).argmax()
+        loss = self.loss_fn(logits, target)
 
         return loss, pred_label, logits
 
@@ -51,7 +51,7 @@ class newProposed:
         for i in range(self.pgd_iterations):
             advx.requires_grad_()
 
-            outputs = [torch.softmax(model(advx), dim=1) + weights[-1] for i, model in enumerate(self.ens_surrogates)]
+            outputs = [model(advx) + weights[-1] for i, model in enumerate(self.ens_surrogates)]
             loss = sum([weights[idx] * self.loss_fn(outputs[idx], target) for idx in range(numb_surrogates)])
 
             loss.backward()
@@ -87,9 +87,9 @@ class newProposed:
 
     def _mean_logits_distance(self, advx, weights, victim_model, ens_surrogates):
 
-        surrogate_sets = [torch.softmax(model(advx), dim=1).detach().squeeze(dim=0) for model in ens_surrogates]
+        surrogate_sets = [model(advx).detach().squeeze(dim=0) for model in ens_surrogates]
         s = sum([weights[i] * surr_log.unsqueeze(dim=0) for i, surr_log in enumerate(surrogate_sets)])
-        mean_distance = torch.norm((torch.softmax(victim_model(advx), dim=1) - s - weights[-1]), p=2)
+        mean_distance = torch.norm(victim_model(advx) - s - weights[-1], p=2)
 
         return mean_distance, surrogate_sets
 
@@ -99,7 +99,7 @@ class newProposed:
         weights = torch.ones(numb_surrogates).to(self.device) / numb_surrogates
         advx = torch.clone(image).unsqueeze(dim=0).detach().to(self.device)
 
-        alpha = 0.1
+        alpha = 0.5
         alphat = torch.tensor(alpha, dtype=torch.double)
 
         loss_list = []
@@ -123,8 +123,6 @@ class newProposed:
 
             if n_step == 0:
 
-                # print("Step:", step)
-                # print("weights:",weights)
                 advx = self._pgd_cycle(weights, advx, target_label, image)
 
                 dist, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
@@ -185,8 +183,13 @@ class newProposed:
                 newA = torch.stack(surrogate_sets, dim=1).to(self.device)
                 newB = torch.squeeze(torch.clone(victim_logits).to(self.device), 0)
 
-                A = torch.cat([A, newA], dim=0).to(self.device)  # here A is computed at the previous iteration
-                B = torch.cat([B, newB], dim=0).to(self.device)  # i'm transposing newB just because the tensor is 1x1000
+                if n_step == 1:
+                    A = newA  # here A is computed at the previous iteration
+                    B = newB  # i'm transposing newB just because the tensor is 1x1000
+                
+                else:
+                    A = torch.cat([A, newA], dim=0).to(self.device)  # here A is computed at the previous iteration
+                    B = torch.cat([B, newB], dim=0).to(self.device)  # i'm transposing newB just because the tensor is 1x1000
 
                 w = self._pytorch_ridge_regression(A, B, alphat)
                 weights = torch.clone(w).squeeze().to(self.device)

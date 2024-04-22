@@ -1,4 +1,5 @@
 import torch
+torch.manual_seed(0)
 from torch.utils.data import DataLoader
 from Attack.Baseline import Baseline
 from Attack.NewAttack import Proposed
@@ -23,8 +24,8 @@ parser.add_argument('--device', type=str, default='cuda', choices=['cuda:0', 'cu
 parser.add_argument('--attack_iterations', type=int, default=40, help='Number of attack iterations')
 parser.add_argument('--pgd_iterations', type=int, default=10, help='Number of pgd iterations')
 parser.add_argument('--loss', type=str, default='CW', choices=['CW', 'CE'], help='Loss function')
-parser.add_argument('--pool', type=str, default='0', choices=['0', '1'], help='Pool of surrogates')
-parser.add_argument('--eps', type=float, default=16 / 255, help='Perturbation Size')
+parser.add_argument('--pool', type=str, default='0', choices=['0', '1', '2'], help='Pool of surrogates')
+parser.add_argument('--eps', type=float, default=8 / 255, help='Perturbation Size')
 args = parser.parse_args()
 
 # attacks parameters
@@ -38,7 +39,7 @@ attack_type = args.attack_type
 victim_name = args.victim
 eps = float(args.eps)
 lr_w = 5e-2
-alpha = 2 * eps / pgd_iterations
+alpha = 3*2* eps / 10
 x = alpha
 pool = int(args.pool)
 
@@ -49,9 +50,17 @@ if pool == 0:
     surrogates = [surr for surr in SURROGATE_NAMES[:numb_surrogates]]
 elif pool == 1:
 
-    surrogates = ["densenet161", "efficientnet_v2_l", "regnet_y_16gf",
+    surrogates_pool = ["densenet161", "efficientnet_v2_l", "regnet_y_16gf",
                   "resnet101", 'inception_v3', 'mnasnet1_0', 'googlenet',
                   'resnet18', 'convnext_small', 'mobilenet_v3_small']
+
+    surrogates = [surr for surr in surrogates_pool[:numb_surrogates]]
+
+elif pool == 2:
+    surrogates_pool =['inception_v3' ,'mobilenet_v3_small', 'squeezenet1_1', 'googlenet', 'resnet18',
+                  'mnasnet1_0', 'densenet161', 'efficientnet_b0',
+                  'regnet_y_400mf', 'resnext101_32x8d']
+    surrogates = [surr for surr in surrogates_pool[:numb_surrogates]]
 
 # loading dataset
 dataset = load_dataset(dataset_name='imagenet')
