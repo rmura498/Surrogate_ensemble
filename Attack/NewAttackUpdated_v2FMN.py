@@ -4,11 +4,11 @@ from Utils.CW_loss import CWLoss
 from torch.nn import CrossEntropyLoss
 import gc
 import numpy as np
+from Utils.fmn_new_eps import FMN
 from torch import nn
 
 
-
-class newProposed:
+class newProposedFMN:
 
     def __init__(
         self,
@@ -39,6 +39,8 @@ class newProposed:
 
         self.loss_fn = loss_functions[loss]
 
+        self.fmn = FMN(ens_surrogates=ens_surrogates, steps=self.pgd_iterations,loss='DLR', epsilon=self.eps, targeted=True, device=self.device)
+
     def _compute_model_loss(self, model, advx, target, weights):
 
         model.eval()
@@ -51,22 +53,8 @@ class newProposed:
 
     def _pgd_cycle(self, weights, advx, target, image):
 
-        numb_surrogates = len(self.ens_surrogates)
+        advx = self.fmn.forward(weights=weights, images=advx, labels=target)
 
-        for i in range(self.pgd_iterations):
-            advx.requires_grad_()
-
-            outputs = [weights[i] * model(advx) for i, model in enumerate(self.ens_surrogates)]
-            loss = sum([self.loss_fn(outputs[idx], target) for idx in range(numb_surrogates)])
-
-            loss.backward()
-
-            with torch.no_grad():
-                grad = advx.grad
-                advx = advx - self.alpha * torch.sign(grad)  # perturb x
-                advx = (image + (advx - image).clamp(min=-self.eps, max=self.eps)).clamp(0, 1)
-        self.surr_loss_list.append([self.loss_fn(outputs[idx], target).item() for idx in range(numb_surrogates)])
-        self.surr_loss_list.append([loss.item()])
         return advx
 
     def _pytorch_ridge_regression(self, X, y, alpha, fit_intercept=True):
@@ -93,7 +81,7 @@ class newProposed:
 
     def _mean_logits_distance(self, advx, weights, victim_model, ens_surrogates):
 
-        surrogate_sets = [weights[i]*model(advx).detach().squeeze(dim=0) for i, model in enumerate(ens_surrogates)]
+        surrogate_sets = [weights[i] * model(advx).detach().squeeze(dim=0) for i, model in enumerate(ens_surrogates)]
         s = sum([surr_log.unsqueeze(dim=0) for i, surr_log in enumerate(surrogate_sets)])
         mean_distance = torch.norm(victim_model(advx) - s, p=2)
 

@@ -5,7 +5,7 @@ from torch.nn import CrossEntropyLoss
 
 class Baseline():
     def __init__(self, victim_model, ens_surrogates, attack_iterations,
-                 alpha, lr, eps, pgd_iterations=10, loss='CW', device='cuda'):
+                 alpha, lr, eps, pgd_iterations=10, loss='CW', device='cuda', norm = 'Linf'):
 
         self.device = device
         self.victim_model = victim_model
@@ -15,6 +15,13 @@ class Baseline():
         self.lr = lr
         self.eps = eps
         self.pgd_iterations = pgd_iterations
+
+        norm_to_num = {
+            'Linf': float('inf'),
+            'L2': 2,
+            }
+
+        self.norm = norm_to_num[norm]
 
         loss_functions = {'CW': CWLoss(),
                           'CE': CrossEntropyLoss()}
@@ -38,14 +45,22 @@ class Baseline():
         for i in range(self.pgd_iterations):
             advx.requires_grad_()
 
-            outputs = [weights[i] * model(advx) for i, model in enumerate(self.ens_surrogates)]
+            outputs = [model(advx) for i, model in enumerate(self.ens_surrogates)]
             loss = sum([weights[idx] * self.loss_fn(outputs[idx], target) for idx in range(numb_surrogates)])
             loss.backward()
 
             with torch.no_grad():
                 grad = advx.grad
                 advx = advx - self.alpha * torch.sign(grad)  # perturb x
-                advx = (image + (advx - image).clamp(min=-self.eps, max=self.eps)).clamp(0, 1)
+                if self.norm == float('inf'):
+                    advx = (image + (advx - image).clamp(min=-self.eps, max=self.eps)).clamp(0, 1)
+                
+                elif self.norm == 2:
+                    pert = advx - image
+                    l2_norm = torch.norm(pert, p=self.norm)
+                    if l2_norm > eps:
+                        pert = pert / l2_norm * self.eps
+                        adv = (im + pert).clamp(0,1)
 
         return advx
 
