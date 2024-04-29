@@ -60,7 +60,7 @@ class Baseline():
                     l2_norm = torch.norm(pert, p=self.norm)
                     if l2_norm > eps:
                         pert = pert / l2_norm * self.eps
-                        adv = (im + pert).clamp(0,1)
+                        adv = (image + pert).clamp(0,1)
 
         return advx
 
@@ -158,12 +158,12 @@ class Baseline():
                     v_loss_list.append(loss.detach().item())
                     weights_list.append(weights.cpu().numpy().tolist())
 
-                if n_query > 5 and last_idx == idx_w:
-                    self.lr /= 2
+                #if n_query > 5 and last_idx == idx_w:
+                    #lr /= 2
                 idx_w = (idx_w + 1) % numb_surrogates
 
                 print(f"pred_label={pred_label.item()}, "
                       f"target={target_label.detach().item()}, queries={n_query} "
-                      f"victmin loss={loss_victim.item()}")
+                      f"victmin loss={loss.item()}")
 
         return n_query, v_loss_list, self.attack_iterations, weights_list

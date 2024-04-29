@@ -24,8 +24,16 @@ parser.add_argument('--attack_iterations', type=int, default=40, help='Number of
 parser.add_argument('--pgd_iterations', type=int, default=10, help='Number of pgd iterations')
 parser.add_argument('--loss', type=str, default='CW', choices=['CW', 'CE'], help='Loss function')
 parser.add_argument('--pool', type=str, default='0', choices=['0', '1', '2'], help='Pool of surrogates')
-parser.add_argument('--eps', type=float, default=8 / 255, help='Perturbation Size')
+parser.add_argument('--eps', type=str, default='0', help='Perturbation Size, 0 16/255, 1 8/255 2 4/255')
+parser.add_argument('--mul', type=int, default=1, help='multiplier step')
 args = parser.parse_args()
+
+multiplier = int(args.mul)
+
+eps_dict = {'0': [16/255, 1], 
+            '1':[8/255, 1], 
+            '2':[4/255, 2]}
+tm = eps_dict[args.eps]
 
 # attacks parameters
 numb_surrogates = int(args.n_surrogates)
@@ -38,7 +46,7 @@ attack_type = args.attack_type
 victim_name = args.victim
 eps = float(args.eps)
 lr_w = 5e-2
-alpha = 3*2* eps / 10
+alpha = 3 * multiplier / 10
 pool = int(args.pool)
 
 attack_dict = {'B': Baseline, 'A': Average0}
@@ -103,12 +111,10 @@ def attack_evaluate():
         results_dict[f'{idx}'] = {'query': query_b,
                                   'loss_list': loss_list_b,
                                   'n_iter': n_iter_b,
-                                  'weights': weights_b,
-                                  'mse': mse_list, 
-                                  'surr_los':surr_loss_list}
+                                  'weights': weights_b}
 
     save_json(results_dict,
-              f'{generate_time()}_{str(attack_dict[attack_type].__name__)}_{victim_name}_b{batch_size}_eps{str(eps)[0:5]}_pool{pool}_surr{numb_surrogates}_PGDi{pgd_iterations}')
+              f'{generate_time()}_{str(attack_dict[attack_type].__name__)}_{victim_name}_b{batch_size}_eps{str(eps)[0:5]}_alp{str(alpha)[0:5]}_pool{pool}_surr{numb_surrogates}_PGDi{pgd_iterations}')
 
 # run attacks
 attack_evaluate()

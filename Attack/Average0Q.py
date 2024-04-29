@@ -39,7 +39,7 @@ class Average0():
         for i in range(self.pgd_iterations):
             advx.requires_grad_()
 
-            outputs = [weights[i] * model(advx) for i, model in enumerate(self.ens_surrogates)]
+            outputs = [model(advx) for i, model in enumerate(self.ens_surrogates)]
             loss = sum([weights[idx] * self.loss_fn(outputs[idx], target) for idx in range(numb_surrogates)])
             loss.backward()
 

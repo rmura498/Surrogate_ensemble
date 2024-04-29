@@ -8,7 +8,7 @@ from torch import nn
 
 
 
-class newProposedv2:
+class newProposedv0:
 
     def __init__(
         self,
@@ -57,8 +57,11 @@ class newProposedv2:
             advx.requires_grad_()
 
             
-            outputs = [model(advx) for i, model in enumerate(self.ens_surrogates)]
-            loss = sum([weights[idx] * self.loss_fn(outputs[idx], target) for idx in range(numb_surrogates)])
+            outputs = [weights[i] *model(advx) for i, model in enumerate(self.ens_surrogates)]
+            ens_logit = torch.zeros_like(outputs[0])
+            for out in outputs:
+                ens_logit += out
+            loss = self.loss_fn(ens_logit, target)
             
             #print(loss)
             loss.backward()

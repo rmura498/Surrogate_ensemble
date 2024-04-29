@@ -1,7 +1,9 @@
 import torch
 torch.manual_seed(0)
 from torch.utils.data import DataLoader
-from Attack.NewAttackUpdated_v2 import newProposed
+from Attack.NewAttackUpdated_v0 import newProposedv0
+from Attack.NewAttackUpdated_v1 import newProposedv1
+from Attack.NewAttackUpdated_v2 import newProposedv2
 from Attack.NewAttackUpdated_v2FMN import newProposedFMN
 from config import SURROGATE_NAMES, VICTIM_NAMES
 from Utils.load_models import load_model, load_dataset, load_surrogates
@@ -11,7 +13,7 @@ from Utils.load_models import load_dataset, load_model
 import argparse
 
 parser = argparse.ArgumentParser(description="Run Attacks")
-parser.add_argument('--attack_type', type=str, default='nP', choices=['B', 'P', 'A', 'nP', 'nPF'], help='Type of attack')
+parser.add_argument('--attack_type', type=str, default='nPv0', choices=['nPv0', 'nPv1', 'nPv2', 'nPF'], help='Type of attack')
 parser.add_argument('--victim', type=str, default='vgg19',
                     choices=['resnext50_32x4d', 'vgg19', 'densenet121', 'alexnet', 'swin_s', 'shufflenet_v2_x2_0',
                              'regnet_y_32gf', 'efficientnet_v2_l'], help='Type of attack')
@@ -26,12 +28,14 @@ parser.add_argument('--pool', type=str, default='0', choices=['0', '1', '2'], he
 parser.add_argument('--eps', type=str, default='0', help='Perturbation Size, 0 16/255, 1 8/255 2 4/255')
 parser.add_argument('--lmb', type=float, default=0.5, help='Penalty of ridge regressor')
 parser.add_argument('--sw', type=int, default=10, help='Sliding Window')
+parser.add_argument('--mul', type=int, default=1, help='multiplier step')
 args = parser.parse_args()
 
+multiplier = int(args.mul)
 
 eps_dict = {'0': [16/255, 1], 
-            '1':[8/255, 2], 
-            '2':[4/255, 4]}
+            '1':[8/255, 1], 
+            '2':[4/255, 2]}
 tm = eps_dict[args.eps]
 
 # attacks parameters
@@ -45,13 +49,13 @@ attack_type = args.attack_type
 victim_name = args.victim
 eps = float(tm[0])
 lr_w = 5e-2
-alpha = tm[1] * 3 * eps / 10
+alpha = tm[1]* multiplier * 3 * eps / 10
 x = alpha
 pool = int(args.pool)
 sw = int(args.sw)
-lmb = int(args.lmb)
+lmb = float(args.lmb)
 
-attack_dict = {'nP': newProposed, 'nPF': newProposedFMN}
+attack_dict = {'nPv0': newProposedv0,'nPv1': newProposedv1,'nPv2': newProposedv2, 'nPF': newProposedFMN}
 attack = attack_dict[attack_type]
 
 if pool == 0:
@@ -118,7 +122,7 @@ def attack_evaluate():
                                   'surr_los':surr_loss_list}
 
     save_json(results_dict,
-              f'{generate_time()}_{str(attack_dict[attack_type].__name__)}_{victim_name}_b{batch_size}_eps{str(eps)[0:5]}_pool{pool}_surr{numb_surrogates}_PGDi{pgd_iterations}_sw{sw}_lmbd{lmb}')
+              f'{generate_time()}_{str(attack_dict[attack_type].__name__)}_{victim_name}_b{batch_size}_eps{str(alpha)[0:5]}_alph{str(eps)[0:5]}_pool{pool}_surr{numb_surrogates}_PGDi{pgd_iterations}_sw{sw}_lmbd{lmb}')
 
 # run attacks
 attack_evaluate()
