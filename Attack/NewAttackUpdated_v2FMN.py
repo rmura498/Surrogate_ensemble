@@ -6,6 +6,7 @@ import gc
 import numpy as np
 from Utils.fmn_new_eps import FMN
 from torch import nn
+from adv_lib.attacks.projected_gradient_descent import pgd_linf
 
 
 class newProposedFMN:
@@ -33,13 +34,12 @@ class newProposedFMN:
         self.pgd_iterations = pgd_iterations
         self.sw=sw
         self.lmb=lmb
+        self.loss_name = loss
 
         loss_functions = {"CW": CWLoss(), "CE": CrossEntropyLoss()}
         self.mse = nn.functional.mse_loss
 
-        self.loss_fn = loss_functions[loss]
-
-        self.fmn = FMN(ens_surrogates=ens_surrogates, steps=self.pgd_iterations,loss='DLR', epsilon=self.eps, targeted=True, device=self.device)
+        self.loss_fn = loss_functions[self.loss_name]
 
     def _compute_model_loss(self, model, advx, target, weights):
 
@@ -52,8 +52,9 @@ class newProposedFMN:
         return loss, pred_label, logits
 
     def _pgd_cycle(self, weights, advx, target, image):
-
-        advx = self.fmn.forward(weights=weights, images=advx, labels=target)
+        
+        advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, inputs=advx, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
+             random_init=False, restarts=5, loss_function=self.loss_name, absolute_step_size=self.eps)
 
         return advx
 
@@ -81,7 +82,7 @@ class newProposedFMN:
 
     def _mean_logits_distance(self, advx, weights, victim_model, ens_surrogates):
 
-        surrogate_sets = [weights[i] * model(advx).detach().squeeze(dim=0) for i, model in enumerate(ens_surrogates)]
+        surrogate_sets = [model(advx).detach().squeeze(dim=0) for i, model in enumerate(ens_surrogates)]
         s = sum([surr_log.unsqueeze(dim=0) for i, surr_log in enumerate(surrogate_sets)])
         mean_distance = torch.norm(victim_model(advx) - s, p=2)
 
@@ -91,7 +92,7 @@ class newProposedFMN:
 
         numb_surrogates = len(self.ens_surrogates)
         weights = torch.ones(numb_surrogates).to(self.device) / numb_surrogates
-        advx = torch.clone(image).unsqueeze(dim=0).detach().to(self.device)
+        advx = torch.clone(image).unsqueeze(dim=0).to(self.device)
 
 
         loss_list = []

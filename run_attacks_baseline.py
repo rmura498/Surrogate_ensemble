@@ -44,9 +44,10 @@ attack_iterations = int(args.attack_iterations)
 pgd_iterations = int(args.pgd_iterations)
 attack_type = args.attack_type
 victim_name = args.victim
-eps = float(args.eps)
+eps = float(tm[0])
 lr_w = 5e-2
-alpha = 3 * multiplier / 10
+alpha = tm[1]* multiplier * 3 * eps / 10
+x = alpha
 pool = int(args.pool)
 
 attack_dict = {'B': Baseline, 'A': Average0}
@@ -93,6 +94,7 @@ def attack_evaluate():
     global images, labels, targets
 
     results_dict = {}
+    print(eps)
 
     results_dict['ensemble'] = surrogates
     print("Surrogates", len(ens_surrogates))

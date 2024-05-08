@@ -122,7 +122,7 @@ def attack_evaluate():
                                   'surr_los':surr_loss_list}
 
     save_json(results_dict,
-              f'{generate_time()}_{str(attack_dict[attack_type].__name__)}_{victim_name}_b{batch_size}_eps{str(alpha)[0:5]}_alph{str(eps)[0:5]}_pool{pool}_surr{numb_surrogates}_PGDi{pgd_iterations}_sw{sw}_lmbd{lmb}')
+              f'{generate_time()}_{str(attack_dict[attack_type].__name__)}_{victim_name}_b{batch_size}_eps{str(eps)[0:5]}_alph{str(alpha)[0:5]}_pool{pool}_{loss}_surr{numb_surrogates}_PGDi{pgd_iterations}_sw{sw}_lmbd{lmb}')
 
 # run attacks
 attack_evaluate()

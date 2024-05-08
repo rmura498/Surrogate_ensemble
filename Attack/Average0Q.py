@@ -77,12 +77,13 @@ class Average0():
 
         n_query = 0
 
-        advx = self._pgd_cycle(image, weights, advx, target_label)
-        loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
-        if pred_label == target_label:
-            print(f"Success pred_label={pred_label.item()}, "
-                    f"target={target_label.detach().item()}, queries={n_query},"
-                    f"victmin loss={loss_victim.item()}")
-            return 0, loss_list, 'ASR:1', weights_list
+        for n in range(5):
+            advx = self._pgd_cycle(image, weights, advx, target_label)
+            loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
+            if pred_label == target_label:
+                print(f"Success pred_label={pred_label.item()}, "
+                        f"target={target_label.detach().item()}, queries={n_query},"
+                        f"victmin loss={loss_victim.item()}")
+                return 0, loss_list, 'ASR:1', weights_list
 
         return 40, loss_list, 'ASR:0', weights_list

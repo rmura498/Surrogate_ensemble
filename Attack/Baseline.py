@@ -79,6 +79,8 @@ class Baseline():
         numb_surrogates = len(self.ens_surrogates)
         weights = torch.ones(numb_surrogates).to(self.device) / numb_surrogates
         advx = torch.clone(image).unsqueeze(dim=0).detach().to(self.device)
+        
+        lr = self.lr
 
         idx_w = 0
         last_idx = 0
@@ -111,7 +113,7 @@ class Baseline():
             else:
                 # optimize w and adv with w = w + delta
                 weights_plus = torch.clone(weights).to(self.device)
-                weights_plus[idx_w] = weights_plus[idx_w] + self.lr
+                weights_plus[idx_w] = weights_plus[idx_w] + lr
 
                 advx_plus = self._pgd_cycle(image, weights_plus, advx, target_label)
                 loss_plus, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx_plus,
@@ -127,7 +129,7 @@ class Baseline():
 
                 # optimize w and adv with w = w - delta
                 weights_minus = torch.clone(weights).to(self.device)
-                weights_minus[idx_w] = weights_minus[idx_w] - self.lr
+                weights_minus[idx_w] = weights_minus[idx_w] - lr
 
                 advx_minus = self._pgd_cycle(image, weights_minus, advx, target_label)
                 loss_minus, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx_minus,
@@ -158,8 +160,8 @@ class Baseline():
                     v_loss_list.append(loss.detach().item())
                     weights_list.append(weights.cpu().numpy().tolist())
 
-                #if n_query > 5 and last_idx == idx_w:
-                    #lr /= 2
+                if n_query > 5 and last_idx == idx_w:
+                    lr /= 2
                 idx_w = (idx_w + 1) % numb_surrogates
 
                 print(f"pred_label={pred_label.item()}, "

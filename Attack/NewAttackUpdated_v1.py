@@ -56,7 +56,7 @@ class newProposedv1:
         for i in range(self.pgd_iterations):
             advx.requires_grad_()
 
-            outputs = [weights[i] *model(advx) for i, model in enumerate(self.ens_surrogates)]
+            outputs = [weights[i] * model(advx) for i, model in enumerate(self.ens_surrogates)]
             loss = sum([self.loss_fn(outputs[idx], target) for idx in range(numb_surrogates)])
             
             #print(loss)
@@ -192,10 +192,12 @@ class newProposedv1:
                 )
 
                 
-                mse_value = [self.mse(surr_log, victim_logits).item() for surr_log in surrogate_sets]
-                #print(mse_value)
-                print("Average value1:", sum(mse_value))
-                mse_list.append(sum(mse_value))
+                ens_logit = torch.zeros_like(surrogate_sets[0])
+                for i , out in enumerate(surrogate_sets):
+                    ens_logit += (weights[i]*out)
+                mse_value = self.mse(ens_logit, victim_logits).item() 
+                print("Mse value:", mse_value)
+                mse_list.append(mse_value)
 
                 newA = torch.stack(surrogate_sets, dim=1).to(self.device)
                 newB = torch.squeeze(torch.clone(victim_logits).to(self.device), 0)
