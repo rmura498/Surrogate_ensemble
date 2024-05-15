@@ -100,13 +100,18 @@ def _pgd_linf(ens_surrogates: list,
         clamp_(delta, lower=lower, upper=upper)
 
     optimizer = Adam([delta], lr=step_size.mean().item())
+    #scheduler = CosineAnnealingLR(optimizer, T_max=steps)
 
 
     for i in range(steps):
         optimizer.zero_grad()
 
         adv_inputs = inputs + delta
-        logits = torch.stack([weights[i] * model(adv_inputs) for i, model in enumerate(ens_surrogates)], dim=0).sum(dim=0)
+        # logits = torch.stack([weights[i] * model(adv_inputs) for i, model in enumerate(ens_surrogates)], dim=0).sum(dim=0)
+        ensemble_outputs = torch.stack([model(adv_inputs) for model in ens_surrogates], dim=0)
+        # print(f"weights shape: {weights.shape}")
+        # print(f"Ensemble outputs shape: {ensemble_outputs.shape}")
+        logits = (weights[:len(ensemble_outputs)].view(-1, 1, 1) * ensemble_outputs).sum(dim=0)
 
         if i == 0 and loss_function.lower() in ['dl', 'dlr']:
             labels_infhot = torch.zeros_like(logits).scatter_(1, labels.unsqueeze(1), float('inf'))
@@ -114,12 +119,13 @@ def _pgd_linf(ens_surrogates: list,
 
         loss = multiplier * loss_func(logits, labels)
         loss.sum().backward()
-        #delta_grad = grad(loss.sum(), delta, only_inputs=True)[0].sign_().mul_(batch_view(step_size))
-        delta_grad = delta.grad.data.sign_().mul_(batch_view(step_size))
+        # delta_grad = grad(loss.sum(), delta, only_inputs=True)[0].sign_().mul_(batch_view(step_size))
+        delta.grad.data.sign_().mul_(batch_view(step_size))
         is_adv = (logits.argmax(1) == labels) if targeted else (logits.argmax(1) != labels)
         best_adv = torch.where(batch_view(is_adv), adv_inputs.detach(), best_adv)
         adv_found.logical_or_(is_adv)
         optimizer.step()                
         clamp_(delta, lower=lower, upper=upper)
+        #scheduler.step()
 
     return adv_found, best_adv

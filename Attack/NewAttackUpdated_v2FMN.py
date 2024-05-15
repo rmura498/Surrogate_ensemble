@@ -54,7 +54,7 @@ class newProposedFMN:
     def _pgd_cycle(self, weights, advx, target, image):
         
         advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, inputs=advx, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
-             random_init=False, restarts=5, loss_function=self.loss_name, absolute_step_size=self.eps)
+             random_init=False, restarts=5, loss_function=self.loss_name, absolute_step_size=self.alpha)
 
         return advx
 
@@ -80,11 +80,15 @@ class newProposedFMN:
 
         return w
 
+
     def _mean_logits_distance(self, advx, weights, victim_model, ens_surrogates):
 
-        surrogate_sets = [model(advx).detach().squeeze(dim=0) for i, model in enumerate(ens_surrogates)]
-        s = sum([surr_log.unsqueeze(dim=0) for i, surr_log in enumerate(surrogate_sets)])
-        mean_distance = torch.norm(victim_model(advx) - s, p=2)
+        ensemble_outputs = torch.stack([model(advx) for model in ens_surrogates], dim=0)
+        surrogate_sets = ensemble_outputs.detach().squeeze(dim=1)
+        s = ensemble_outputs.sum(dim=0)
+
+        mean_distance = torch.linalg.norm(victim_model(advx) - s, ord=2)
+
 
         return mean_distance, surrogate_sets
 
@@ -114,7 +118,7 @@ class newProposedFMN:
         s_wind = self.sw
         lambt = torch.tensor(self.lmb, dtype=torch.double)
 
-
+        model_drop_counter = torch.zeros(numb_surrogates).to(self.device)
         for n_step in range(self.attack_iterations):
 
             print(f"#Iteration - {n_step}#")
@@ -142,12 +146,15 @@ class newProposedFMN:
                 print(f"Mean dist iter {n_step}:", dist.item())
 
                 B = torch.clone(victim_logits).to(self.device)
-                A = torch.stack(surrogate_sets, dim=1)
-                B = torch.squeeze(B, 0).T 
+                # A = torch.stack(surrogate_sets, dim=1)
+                A = surrogate_sets.detach().clone().T
+                B = torch.squeeze(B, 0).T
+
 
                 # Ridge Regression
                 w = self._pytorch_ridge_regression(A, B, lambt)
                 weights = torch.clone(w).squeeze().to(self.device)
+                weights_before = weights.clone().detach().to(self.device)
 
             else:
 
@@ -178,12 +185,15 @@ class newProposedFMN:
                 )
 
                 
-                mse_value = [self.mse(surr_log, victim_logits).item() for surr_log in surrogate_sets]
-                #print(mse_value)
-                print("Average value1:", sum(mse_value))
-                mse_list.append(sum(mse_value))
+                ens_logit = torch.zeros_like(surrogate_sets[0])
+                for i , out in enumerate(surrogate_sets):
+                    ens_logit += (weights[i]*out)
+                mse_value = self.mse(ens_logit, victim_logits).item() 
+                print("Mse value:", mse_value)
+                mse_list.append(mse_value)
 
-                newA = torch.stack(surrogate_sets, dim=1).to(self.device)
+                # newA = torch.stack(surrogate_sets, dim=1).to(self.device)
+                newA = surrogate_sets.detach().clone().T
                 newB = torch.squeeze(torch.clone(victim_logits).to(self.device), 0)
 
                 if n_step == 1:
@@ -209,6 +219,10 @@ class newProposedFMN:
                 w = self._pytorch_ridge_regression(A, B, lambt)
                 weights = torch.clone(w).squeeze().to(self.device)
                 #print(weights)
+                #if n_step > 1:  
+                #    weights = 1*last_weights + weights / torch.norm(weights[:-1], p=2)
+                    # intercept = torch.abs(weights[-1]+0.5)
+                #last_weights = weights
 
 
         return n_query, loss_list, self.attack_iterations, weights_list, mse_list, self.surr_loss_list

@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(description="Run Attacks")
 parser.add_argument('--attack_type', type=str, default='B', choices=['B', 'A'], help='Type of attack')
 parser.add_argument('--victim', type=str, default='vgg19',
                     choices=['resnext50_32x4d', 'vgg19', 'densenet121', 'alexnet', 'swin_s', 'shufflenet_v2_x2_0',
-                             'regnet_y_32gf', 'efficientnet_v2_l'], help='Type of attack')
+                             'regnet_y_32gf', 'efficientnet_v2_l', 'vit_l_16'], help='Type of attack')
 parser.add_argument('--n_surrogates', type=int, default=20, help='Number of Surrogates')
 parser.add_argument('--batch_size', type=int, default=10, help='Number of sample to evaluate')
 parser.add_argument('--device', type=str, default='cuda', choices=['cuda:0', 'cuda:1', 'cuda:2', 'cpu'], help='Device to use (cpu, cuda:0, '

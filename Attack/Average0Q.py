@@ -1,6 +1,7 @@
 import torch
 from Utils.CW_loss import CWLoss
 from torch.nn import CrossEntropyLoss
+from adv_lib.attacks.projected_gradient_descent import pgd_linf
 
 
 class Average0():
@@ -32,31 +33,12 @@ class Average0():
 
         return loss, pred_label, logits
 
-    def _pgd_cycle(self, image, weights, advx, target):
-
-        numb_surrogates = len(self.ens_surrogates)
-
-        for i in range(self.pgd_iterations):
-            advx.requires_grad_()
-
-            outputs = [model(advx) for i, model in enumerate(self.ens_surrogates)]
-            loss = sum([weights[idx] * self.loss_fn(outputs[idx], target) for idx in range(numb_surrogates)])
-            loss.backward()
-
-            with torch.no_grad():
-                grad = advx.grad
-                advx = advx - self.alpha * torch.sign(grad)  # perturb x
-                advx = (image + (advx - image).clamp(min=-self.eps, max=self.eps)).clamp(0, 1)
+    def _pgd_cycle(self, weights, advx, target, image):
+        
+        advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, inputs=advx, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
+             random_init=False, restarts=5, loss_function='cw', absolute_step_size=self.alpha)
 
         return advx
-
-    def _mean_logits_distance(self, advx, weights, victim_model, ens_surrogates):
-        surrogate_sets = [model(advx).detach().squeeze(dim=0) for model in ens_surrogates]
-        outputs = [torch.norm((victim_model(advx) - weights[i] * surr_log.unsqueeze(dim=0)), p=2).item() for
-                   i, surr_log in enumerate(surrogate_sets)]
-        mean_distance = torch.mean(torch.tensor(outputs))
-
-        return mean_distance, surrogate_sets
 
     def forward(self, image, true_label, target_label):
 
@@ -76,14 +58,12 @@ class Average0():
         loss_list.append(init_loss.detach().item())
 
         n_query = 0
-
-        for n in range(5):
-            advx = self._pgd_cycle(image, weights, advx, target_label)
-            loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
-            if pred_label == target_label:
-                print(f"Success pred_label={pred_label.item()}, "
-                        f"target={target_label.detach().item()}, queries={n_query},"
-                        f"victmin loss={loss_victim.item()}")
-                return 0, loss_list, 'ASR:1', weights_list
+        advx = self._pgd_cycle(image=image, weights=weights, advx=advx, target=target_label)
+        loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
+        if pred_label == target_label:
+            print(f"Success pred_label={pred_label.item()}, "
+                    f"target={target_label.detach().item()}, queries={n_query},"
+                    f"victmin loss={loss_victim.item()}")
+            return 0, loss_list, 'ASR:1', weights_list
 
         return 40, loss_list, 'ASR:0', weights_list
