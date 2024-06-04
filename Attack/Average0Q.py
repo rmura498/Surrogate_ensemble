@@ -36,7 +36,7 @@ class Average0():
     def _pgd_cycle(self, weights, advx, target, image):
         
         advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, inputs=advx, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
-             random_init=False, restarts=5, loss_function='cw', absolute_step_size=self.alpha)
+             random_init=False, restarts=1, loss_function='cw', absolute_step_size=self.alpha)
 
         return advx
 
@@ -58,12 +58,14 @@ class Average0():
         loss_list.append(init_loss.detach().item())
 
         n_query = 0
-        advx = self._pgd_cycle(image=image, weights=weights, advx=advx, target=target_label)
-        loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
-        if pred_label == target_label:
-            print(f"Success pred_label={pred_label.item()}, "
-                    f"target={target_label.detach().item()}, queries={n_query},"
-                    f"victmin loss={loss_victim.item()}")
-            return 0, loss_list, 'ASR:1', weights_list
+        for i in range(5):
+
+            advx = self._pgd_cycle(image=image, weights=weights, advx=advx, target=target_label)
+            loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
+            if pred_label == target_label:
+                print(f"Success pred_label={pred_label.item()}, "
+                        f"target={target_label.detach().item()}, queries={n_query},"
+                        f"victmin loss={loss_victim.item()}")
+                return 0, loss_list, 'ASR:1', weights_list
 
         return 40, loss_list, 'ASR:0', weights_list

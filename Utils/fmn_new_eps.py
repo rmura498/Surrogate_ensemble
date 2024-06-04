@@ -173,14 +173,13 @@ class FMN:
             adv_images = images + delta
             adv_images = adv_images.to(self.device)
 
-            logits = [model(adv_images)*weights[i] for i, model in enumerate(self.ens_surrogates)]
-            
-            pred_labels = torch.cat([logits[i].argmax(dim=1) for i in range(len(self.ens_surrogates))], dim=0).to(self.device)
-            #print("LAbels", pred_labels)
-            is_adv = torch.tensor(all(pred_label == labels for pred_label in pred_labels)).to(self.device)
-            #is_adv = (pred_labels == labels) if self.targeted else (pred_labels != labels)
-            #print(is_adv)
-
+            outputs = [model(adv_images)*weights[i] for i, model in enumerate(self.ens_surrogates)]
+            ens_logit = torch.zeros_like(outputs[0])
+            for out in outputs:
+                ens_logit += out
+            pred_label = ens_logit.argmax()
+            is_adv = pred_label == labels 
+            print(is_adv)
             is_smaller = delta_norm < init_trackers['best_norm']
             is_both = is_adv & is_smaller
             init_trackers['adv_found'].logical_or_(is_adv)
@@ -188,12 +187,9 @@ class FMN:
             init_trackers['best_adv'] = torch.where(batch_view(is_both), adv_images.detach(),
                                                     init_trackers['best_adv'])
 
-
-            loss = [-loss_fn.forward(logits[i], labels) for i in range(len(self.ens_surrogates))]
-            #print(loss)
-            loss = sum(loss)
-            #print(loss)
-            #if isinstance(loss_fn, LL): loss = multiplier * -loss
+            
+            loss = loss_fn.forward(ens_logit, labels)
+            if isinstance(loss_fn, LL): loss = -multiplier * loss
 
             # Optimizer Step (gradient ascent)
             if isinstance(scheduler, ReduceLROnPlateau):

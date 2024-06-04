@@ -112,7 +112,7 @@ def attack_evaluate():
 
         print(f"\n-------- Sample Number:{idx} - victim {victim_name} -------- ")
         print(f"### {str(attack_dict[attack_type].__name__)} ###")
-        query_b, loss_list_b, n_iter_b, weights_b, mse_list, surr_loss_list = attacker.forward(image, label, target)
+        query_b, loss_list_b, n_iter_b, weights_b, mse_list, surr_loss_list = attacker.forward_onlyrr(image, label, target)
         results_dict[f'{idx}'] = {'query': query_b,
                                   'loss_list': loss_list_b,
                                   'n_iter': n_iter_b,
