@@ -98,8 +98,9 @@ def _pgd_linf(ens_surrogates: list,
     if random_init:
         delta.data.uniform_(-1, 1).mul_(batch_view(eps))
         clamp_(delta, lower=lower, upper=upper)
-
     for i in range(steps):
+        if i > 0:
+            delta.requires_grad_()
         adv_inputs = inputs + delta
         ensemble_outputs = torch.stack([model(adv_inputs) for model in ens_surrogates], dim=0)
         logits = (weights[:len(ensemble_outputs)].view(-1, 1, 1) * ensemble_outputs).sum(dim=0)
@@ -109,10 +110,13 @@ def _pgd_linf(ens_surrogates: list,
             loss_func = partial(loss_func, labels_infhot=labels_infhot)
 
         loss = multiplier * loss_func(logits, labels)
-        loss.sum().backward()
-        delta.grad.data.sign_().mul_(batch_view(step_size))
-        is_adv = (logits.argmax(1) == labels) if targeted else (logits.argmax(1) != labels)
-        best_adv = torch.where(batch_view(is_adv), adv_inputs.detach(), best_adv)
-        adv_found.logical_or_(is_adv)
-        clamp_(delta, lower=lower, upper=upper)
+        loss.sum().backward(retain_graph=True)
+        with torch.no_grad():
+            is_adv = (logits.argmax(1) == labels) if targeted else (logits.argmax(1) != labels)
+            best_adv = torch.where(batch_view(is_adv), adv_inputs.detach(), best_adv)
+            adv_found.logical_or_(is_adv)
+            grad = delta.grad.data.sign_().mul_(batch_view(step_size))
+            # grad = delta.grad.clone()
+            delta = delta - grad
+            clamp_(delta, lower=lower, upper=upper)
     return adv_found, best_adv

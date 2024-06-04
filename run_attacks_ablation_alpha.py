@@ -12,21 +12,21 @@ from Utils.utils import save_json, generate_time, normalize
 from Utils.load_models import load_dataset, load_model
 import argparse
 parser = argparse.ArgumentParser(description="Run Attacks")
-parser.add_argument('--attack_type', type=str, default='nPv0', choices=['nPv0', 'nPv1', 'nPv2', 'nPF'], help='Type of attack')
-parser.add_argument('--victim', type=str, default='vgg19',
+parser.add_argument('--attack_type', type=str, default='nPF', choices=['nPv0', 'nPv1', 'nPv2', 'nPF'], help='Type of attack')
+parser.add_argument('--victim', type=str, default='swin_s',
                     choices = ['resnext50_32x4d', 'vgg19', 'densenet121', 'alexnet', 'swin_s', 'shufflenet_v2_x2_0',
                                'regnet_y_32gf', 'efficientnet_v2_l', 'vit_l_16'], help = 'Victims')
-parser.add_argument('--n_surrogates', type=int, default=20, help='Number of Surrogates')
-parser.add_argument('--batch_size', type=int, default=10, help='Number of sample to evaluate')
-parser.add_argument('--device', type=str, default='cuda', choices=['cuda:0', 'cuda:1', 'cuda:2', 'cpu'], help='Device to use (cpu, cuda:0, '
+parser.add_argument('--n_surrogates', type=int, default=10, help='Number of Surrogates')
+parser.add_argument('--batch_size', type=int, default=100, help='Number of sample to evaluate')
+parser.add_argument('--device', type=str, default='cuda:0', choices=['cuda:0', 'cuda:1', 'cuda:2', 'cpu'], help='Device to use (cpu, cuda:0, '
                                                                                         'cuda:1)')
 parser.add_argument('--attack_iterations', type=int, default=40, help='Number of attack iterations')
-parser.add_argument('--pgd_iterations', type=int, default=10, help='Number of pgd iterations')
+parser.add_argument('--pgd_iterations', type=int, default=100, help='Number of pgd iterations')
 parser.add_argument('--loss', type=str, default='CW', choices=['CW', 'CE'], help='Loss function')
-parser.add_argument('--pool', type=str, default='0', choices=['0', '1', '2'], help='Pool of surrogates')
+parser.add_argument('--pool', type=str, default='2', choices=['0', '1', '2'], help='Pool of surrogates')
 parser.add_argument('--eps', type=str, default='0', help='Perturbation Size, 0 16/255, 1 8/255 2 4/255')
 parser.add_argument('--lmb', type=float, default=0.5, help='Penalty of ridge regressor')
-parser.add_argument('--sw', type=int, default=10, help='Sliding Window')
+parser.add_argument('--sw', type=int, default=40, help='Sliding Window')
 parser.add_argument('--mul', type=int, default=1, help='multiplier step')
 args = parser.parse_args()
 
