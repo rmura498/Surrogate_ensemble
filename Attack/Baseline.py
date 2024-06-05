@@ -3,7 +3,7 @@ from Utils.CW_loss import CWLoss
 from torch.nn import CrossEntropyLoss
 
 
-class Baseline():
+class Baseline:
     def __init__(self, victim_model, ens_surrogates, attack_iterations,
                  alpha, lr, eps, pgd_iterations=10, loss='CW', device='cuda', norm = 'Linf'):
 
