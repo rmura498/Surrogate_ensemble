@@ -2,11 +2,11 @@ import torch
 from Utils.CW_loss import CWLoss
 from torch.nn import CrossEntropyLoss
 import torch.nn as nn
-from Utils.TREMBA_Utils import utils, FCN
+from Utils.TREMBA_Utils import FCN
 
 
 class BaselineTREMBA:
-    def __init__(self, function, victim_model, source_model, attack_iterations,
+    def __init__(self, function, encoder_weight, decoder_weight, victim_model, attack_iterations,
                  alpha, lr, eps, pgd_iterations=10, loss='CW', device='cuda', norm='Linf'):
 
         self.device = device
@@ -19,7 +19,6 @@ class BaselineTREMBA:
         self.decoder = FCN.Imagenet_Decoder()
         self.function = function
         self.victim_model = victim_model
-        self.source_model = source_model
 
         self.loss_list = []
 
@@ -35,6 +34,12 @@ class BaselineTREMBA:
 
         self.loss_fn = loss_functions[loss]
 
+        self.encoder.load_state_dict(encoder_weight)
+        self.decoder.load_state_dict(decoder_weight)
+        self.encoder.to(self.device)
+        self.decoder.to(self.device)
+
+
     def forward(self, images, labels, state):
         images = images.to(self.device)
         labels = int(labels)
@@ -44,23 +49,8 @@ class BaselineTREMBA:
             torch.cuda.empty_cache()
             if state['target']:
                 labels = state['target_class']
-
-            if 'OSP' in state:
-                hinge_loss = utils.MarginLoss_Single(state['white_box_margin'], state['target'])
-                images.requires_grad = True
-                latents = self.encoder(images)
-                for k in range(state['white_box_iters']):
-                    perturbations = self.decoder(latents) * state['epsilon']
-                    logits = self.source_model(torch.clamp(images + perturbations, 0, 1))
-                    loss = hinge_loss(logits, labels)
-                    grad = torch.autograd.grad(loss, latents)[0]
-                    latents = latents - state['white_box_lr'] * grad
-
-                with torch.no_grad():
-                    success, adv, query, n_iter = self.embed_ba(images[0], labels, state, latents.view(-1))
-            else:
-                with torch.no_grad():
-                    success, adv, query, n_iter = self.embed_ba(images[0], labels, state)
+            with torch.no_grad():
+                success, adv, query, n_iter = self.embed_ba(images, labels, state)
 
             self.function.new_counter()
             return query, self.loss_list, n_iter
@@ -78,6 +68,7 @@ class BaselineTREMBA:
             perturbation = torch.clamp(self.decoder(latent.unsqueeze(0)).squeeze(0) * config['epsilon'], -config['epsilon'],
                                        config['epsilon'])
             logit, loss = self.function(torch.clamp(image + perturbation, 0, 1), label)
+            self.loss_list.append(loss.detach().cpu().item())
             if config['target']:
                 success = torch.argmax(logit, dim=1) == label
             else:
@@ -92,14 +83,14 @@ class BaselineTREMBA:
                 return True, torch.clamp(image + perturbation, 0, 1), n_iter + 1, n_iter
 
             nn.init.normal_(noise)
-            noise[:, config['sample_size'] // 2:] = -noise[:, :config['sample_size'] // 2]
+            # noise[:, config['sample_size'] // 2:] = -noise[:, :config['sample_size'] // 2]
             latents = latent.repeat(config['sample_size'], 1) + noise.transpose(0, 1) * config['sigma']
             perturbations = torch.clamp(self.decoder(latents) * config['epsilon'], -config['epsilon'], config['epsilon'])
             _, losses = self.function(torch.clamp(image.expand_as(perturbations) + perturbations, 0, 1), label)
 
             grad = torch.mean(losses.expand_as(noise) * noise, dim=1)
 
-            if iter % config['log_interval'] == 0 and config['print_log']:
+            if n_iter % config['log_interval'] == 0 and config['print_log']:
                 print("iteration: {} loss: {}, l2_deviation {}".format(n_iter, float(loss.item()),
                                                                        float(torch.norm(perturbation))))
             self.loss_list.append(loss.item())

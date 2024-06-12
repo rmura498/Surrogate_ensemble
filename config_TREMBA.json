@@ -7,13 +7,13 @@
     "target": true,
     "target_class": 0,
     "model_name": "Densenet121",
-    "generator_name": "Imagenet_VGG16_Resnet18_Squeezenet_Googlenet_target_0",
+    "generator_name": "Imagenet_VGG16_Resnet18_Squeezenet_Googlenet_target",
 
     "print_log": false,
     "log_interval": 10,
 
     "sample_size": 20,
-    "num_iters": 2500,
+    "num_iters": 40,
     "sigma": 1.0,
     "lr": 3.0,
     "lr_min": 0.1,
