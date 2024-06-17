@@ -33,24 +33,29 @@ class Average0():
 
         return loss, pred_label, logits
 
-    def _pgd_cycle(self, weights, advx, target, image):
+    # def _pgd_cycle(self, weights, advx, target, image):
+    def _pgd_cycle(self, image, weights, target):
         
-        advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, inputs=advx, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
+        advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, inputs=image, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
              random_init=False, restarts=1, loss_function='cw', absolute_step_size=self.alpha)
-
+        
+        _norm = (advx-image).data.flatten(1).norm(p=torch.inf, dim=1).median().item()
+        print(f"[BB attack info] norm after PGD: {_norm}")
+        
         return advx
 
     def forward(self, image, true_label, target_label):
 
         numb_surrogates = len(self.ens_surrogates)
         weights = torch.ones(numb_surrogates).to(self.device) / numb_surrogates
+        image = image.unsqueeze(0).to(self.device)
         advx = torch.clone(image).unsqueeze(dim=0).detach().to(self.device)
 
         loss_list = []
         weights_list = []
         weights_list.append(weights.cpu().numpy().tolist())
 
-        init_loss, pred_label, _ = self._compute_model_loss(self.victim_model, image.unsqueeze(dim=0), target_label)
+        init_loss, pred_label, _ = self._compute_model_loss(self.victim_model, image, target_label)
 
         print("True label", true_label.item())
         print("pred label", pred_label.item())
@@ -60,7 +65,8 @@ class Average0():
         n_query = 0
         for i in range(5):
 
-            advx = self._pgd_cycle(image=image, weights=weights, advx=advx, target=target_label)
+            # advx = self._pgd_cycle(image=image, weights=weights, advx=advx, target=target_label)
+            advx = self._pgd_cycle(image=image, weights=weights, target=target_label)
             loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label)
             if pred_label == target_label:
                 print(f"Success pred_label={pred_label.item()}, "

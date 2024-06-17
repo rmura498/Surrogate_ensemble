@@ -47,29 +47,34 @@ class newProposedFMN:
         model.eval()
         logits = model(advx)
         logits = logits.detach()
-        pred_label = (logits).argmax()
+        pred_label = logits.argmax()
         loss = self.loss_fn(logits, target)
 
         return loss, pred_label, logits
 
-    def _pgd_cycle(self, weights, advx, target, image):
-
+    # def _pgd_cycle(self, weights, advx, target, image):
+    def _pgd_cycle(self, image, weights, target):
         if self.pgd_iterations == 20:
             restarts = 20
         else:
             restarts = 5
         
-        advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, inputs=advx, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
+        advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, original_inputs=image, inputs=advx, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
              random_init=False, restarts=restarts, loss_function=self.loss_name, absolute_step_size=self.alpha)
+        _norm = (advx-image).data.flatten(1).norm(p=torch.inf, dim=1).median().item()
+        print(f"[BB attack info] norm after PGD: {_norm}")
 
         return advx
 
-    def _pgd_cycle_norestart(self, weights, advx, target):
+    # def _pgd_cycle_norestart(self, weights, advx, target):
+    def _pgd_cycle_norestart(self, image, weights, target):
         restarts = 1
-        advx = pgd_linf_vanilla(ens_surrogates=self.ens_surrogates, weights=weights, inputs=advx, labels=target, eps=self.eps,
+        advx = pgd_linf_vanilla(ens_surrogates=self.ens_surrogates, weights=weights, inputs=image, labels=target, eps=self.eps,
                         targeted=True, steps=self.pgd_iterations,
                         random_init=False, restarts=restarts, loss_function=self.loss_name,
                         absolute_step_size=self.alpha)
+        _norm = (advx-image).data.flatten(1).norm(p=torch.inf, dim=1).median().item()
+        print(f"[BB attack info] norm after PGD: {_norm}")
 
         return advx
 
@@ -111,6 +116,7 @@ class newProposedFMN:
 
         numb_surrogates = len(self.ens_surrogates)
         weights = torch.ones(numb_surrogates).to(self.device) / numb_surrogates
+        image = image.unsqueeze(0).to(self.device)
         advx = torch.clone(image).unsqueeze(dim=0).to(self.device)
 
 
@@ -121,7 +127,7 @@ class newProposedFMN:
         self.surr_loss_list = []
 
         init_loss, pred_label, _ = self._compute_model_loss(
-            self.victim_model, image.unsqueeze(dim=0), target_label, weights
+            self.victim_model, image, target_label, weights
         )
 
         print("True label", true_label.item())
@@ -140,7 +146,7 @@ class newProposedFMN:
 
             if n_step == 0:
 
-                advx = self._pgd_cycle(weights, advx, target_label, image)
+                advx = self._pgd_cycle(image, weights, target_label)
 
                 dist, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
                 dist_list.append(dist.detach().cpu().item())
@@ -169,11 +175,11 @@ class newProposedFMN:
                 # Ridge Regression
                 w = self._pytorch_ridge_regression(A, B, lambt)
                 weights = torch.clone(w).squeeze().to(self.device)
-                weights_before = weights.clone().detach().to(self.device)
+                # weights_before = weights.clone().detach().to(self.device)
 
             else:
 
-                advx = self._pgd_cycle(weights, advx, target_label, image)
+                advx = self._pgd_cycle(image, weights, target_label)
 
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label, weights)
                 n_query += 1
@@ -246,6 +252,7 @@ class newProposedFMN:
 
         numb_surrogates = len(self.ens_surrogates)
         weights = torch.ones(numb_surrogates).to(self.device) / numb_surrogates
+        image = image.unsqueeze(0).to(self.device)
         advx = torch.clone(image).unsqueeze(dim=0).to(self.device)
 
         loss_list = []
@@ -255,7 +262,7 @@ class newProposedFMN:
         self.surr_loss_list = []
 
         init_loss, pred_label, _ = self._compute_model_loss(
-            self.victim_model, image.unsqueeze(dim=0), target_label, weights
+            self.victim_model, image, target_label, weights
         )
 
         print("True label", true_label.item())
@@ -274,7 +281,7 @@ class newProposedFMN:
 
             if n_step == 0:
 
-                advx = self._pgd_cycle_norestart(weights, advx, target_label)
+                advx = self._pgd_cycle_norestart(image, weights, target_label)
 
                 dist, surrogate_sets = self._mean_logits_distance(advx, weights, self.victim_model, self.ens_surrogates)
                 dist_list.append(dist.detach().cpu().item())
@@ -303,11 +310,11 @@ class newProposedFMN:
                 # Ridge Regression
                 w = self._pytorch_ridge_regression(A, B, lambt)
                 weights = torch.clone(w).squeeze().to(self.device)
-                weights_before = weights.clone().detach().to(self.device)
+                # weights_before = weights.clone().detach().to(self.device)
 
             else:
 
-                advx = self._pgd_cycle_norestart(weights, advx, target_label)
+                advx = self._pgd_cycle_norestart(image, weights, target_label)
 
                 loss_victim, pred_label, victim_logits = self._compute_model_loss(self.victim_model, advx, target_label,
                                                                                   weights)
