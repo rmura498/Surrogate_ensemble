@@ -47,7 +47,7 @@ class newProposedFMN:
         model.eval()
         logits = model(advx)
         logits = logits.detach()
-        pred_label = logits.argmax()
+        pred_label = (logits).argmax()
         loss = self.loss_fn(logits, target)
 
         return loss, pred_label, logits
@@ -59,7 +59,7 @@ class newProposedFMN:
         else:
             restarts = 5
         
-        advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, original_inputs=image, inputs=advx, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
+        advx = pgd_linf(ens_surrogates=self.ens_surrogates, weights=weights, inputs=image, labels=target, eps=self.eps, targeted=True, steps=self.pgd_iterations,
              random_init=False, restarts=restarts, loss_function=self.loss_name, absolute_step_size=self.alpha)
         _norm = (advx-image).data.flatten(1).norm(p=torch.inf, dim=1).median().item()
         print(f"[BB attack info] norm after PGD: {_norm}")
